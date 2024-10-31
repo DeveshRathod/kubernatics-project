@@ -1,0 +1,94 @@
+
+Passing Environment Variables in React App with Kubernetes
+
+React applications traditionally don’t support runtime environment variables because they are hardcoded at build time. 
+In a Kubernetes deployment, we can work around this limitation by using a script to dynamically inject environment 
+variables that the app can access at runtime. This setup will allow your React app to use Kubernetes environment 
+variables without requiring a rebuild every time you deploy to a new environment.
+
+---
+
+Steps to Set Up Kubernetes Environment Variables in a React App
+
+1. Create env-config.js File for Dynamic Environment Variables
+
+Create a file called env-config.js in the public directory of your React app. 
+This file will be loaded at runtime and contain environment variables provided by Kubernetes.
+
+Example: public/env-config.js
+```javascript
+window._env_ = {
+  REACT_APP_API_BASE_URL: "default_value"
+};
+```
+
+2. Update Dockerfile to Replace env-config.js with Kubernetes Variables
+
+Modify the Dockerfile to use a startup script (entrypoint.sh) that replaces the contents of env-config.js with 
+Kubernetes env variables at container startup. This way, the React app can read from env-config.js at runtime.
+
+Updated Dockerfile:
+```dockerfile
+# Stage 1: Build React app
+FROM node:18 AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# Stage 2: Set up Apache server
+FROM httpd:2.4
+COPY --from=build /app/build /usr/local/apache2/htdocs/
+
+# Add env-config.js for runtime configuration
+COPY public/env-config.js /usr/local/apache2/htdocs/env-config.js
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 80
+CMD ["/entrypoint.sh"]
+```
+
+3. Create entrypoint.sh Script to Inject Environment Variables
+
+The entrypoint.sh script will generate the content for env-config.js based on Kubernetes environment variables.
+
+Example: entrypoint.sh
+```bash
+#!/bin/bash
+# Replace placeholders in env-config.js with Kubernetes env variables
+echo "window._env_ = {" > /usr/local/apache2/htdocs/env-config.js
+echo "  REACT_APP_API_BASE_URL: '$REACT_APP_API_BASE_URL'," >> /usr/local/apache2/htdocs/env-config.js
+echo "};" >> /usr/local/apache2/htdocs/env-config.js
+
+# Start Apache
+httpd-foreground
+```
+
+4. Update src/config.js to Read from env-config.js
+
+Modify your React app configuration (src/config.js) to read values from window._env_ instead of process.env. 
+This way, the app accesses REACT_APP_API_BASE_URL at runtime.
+
+Updated src/config.js:
+```javascript
+// src/config.js
+
+// Check if the environment variable exists in window._env_, or fall back to a default value.
+const API_BASE_URL = window._env_ && window._env_.REACT_APP_API_BASE_URL 
+  ? window._env_.REACT_APP_API_BASE_URL 
+  : "http://localhost:5000"; // default value if undefined
+
+export default API_BASE_URL;
+```
+
+---
+
+Explanation of the Workflow
+
+1. Kubernetes Environment Variables: In your Kubernetes deployment, set the environment variables as desired.
+2. Docker Entrypoint Script: The entrypoint.sh script generates env-config.js with values from Kubernetes env variables, making them available in the HTML served by Apache.
+3. React App: src/config.js now reads API_BASE_URL from env-config.js via window._env_, allowing the value to be set dynamically without a new build.
+
+This setup enables your React app to leverage environment variables in a Kubernetes deployment and makes it adaptable across different environments (e.g., dev, staging, production).
