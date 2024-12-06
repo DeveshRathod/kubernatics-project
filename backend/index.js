@@ -5,12 +5,11 @@ import morgan from "morgan";
 import dotenv from "dotenv";
 const app = express();
 
-
-dotenv.config()
+dotenv.config();
 
 app.use(cors());
 app.use(express.json());
-app.use(morgan('common'));
+app.use(morgan("common"));
 
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
@@ -18,7 +17,7 @@ const db = mysql.createConnection({
   password: process.env.DB_PASSWORD,
   port: process.env.PORT,
   database: "defaultdb",
-  ssl: { rejectUnauthorized: false }, 
+  ssl: { rejectUnauthorized: false },
 });
 
 db.connect((err) => {
@@ -28,7 +27,6 @@ db.connect((err) => {
   }
   console.log("Connected to MySQL database.");
 });
-
 
 app.get("/", (req, res) => {
   res.json("hello");
@@ -73,7 +71,8 @@ app.delete("/books/:id", (req, res) => {
 
 app.put("/books/:id", (req, res) => {
   const bookId = req.params.id;
-  const q = "UPDATE books SET `title`= ?, `desc`= ?, `price`= ?, `cover`= ? WHERE id = ?";
+  const q =
+    "UPDATE books SET `title`= ?, `desc`= ?, `price`= ?, `cover`= ? WHERE id = ?";
 
   const values = [
     req.body.title,
@@ -82,7 +81,7 @@ app.put("/books/:id", (req, res) => {
     req.body.cover,
   ];
 
-  db.query(q, [...values,bookId], (err, data) => {
+  db.query(q, [...values, bookId], (err, data) => {
     if (err) return res.send(err);
     return res.json(data);
   });
